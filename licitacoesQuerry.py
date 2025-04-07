@@ -88,49 +88,32 @@ def join_csv(input_path, input_path_2, output_path):
     
     save_csv(joined_data, output_path)
 
-import os
-import json
-import re
-from pathlib import Path
-import csv
-
 def check_classification(input_path, output_path):
     existing_data = read_csv_dict(input_path)
-    for row in existing_data:
-        row['ID_SUBCAT'] = ''
-        print(row['DS_ITEM'])
-    
     filename = os.path.join(Path(__file__).resolve().parent, 'data', 'categories.json')
     with open(filename, 'r') as categ_jsonfile:
-        categ_json_str = json.load(categ_jsonfile)
-        categ_json_dict = json.loads(categ_json_str)
-        # print(categ_json_dict)
-        categ_jsonfile.close()
-    """with the name of the product, classify its category/subcategory"""
+        raw_json_str = categ_jsonfile.read()
+        if raw_json_str.startswith('"') and raw_json_str.endswith('"'):
+            categ_data = json.loads(json.loads(raw_json_str))
+        else:
+            categ_data = json.loads(raw_json_str)
+    compiled_rules = []
+    for key, categ_type in categ_data.items():
+        for rule in categ_type["Regex"]:
+            compiled_rules.append((key, re.compile(rule)))
 
     for row in existing_data:
-        # print(row)
-        name = row['DS_ITEM']
-        print(name)
-        try:
-            name=name.lower()            
-            #look for rule that applies
-            for key, categ_type in categ_json_dict.items():
-                # print(categ_type['Sub_Name'])
-                for rule in categ_type["Regex"]:
-                    result=re.search(rule,name.lower())
-                    if result is not None:
-                        row['ID_SUBCAT'] = key #returns the ID_Subcat of the rule
-            # return 1 #returns 1 for "not classified"
-            #** IF IT RETURNS 1, 'NOT CATEGORIZED'
-            row['ID_SUBCAT'] = 1
-        except:
-            row['ID_SUBCAT'] = 1
-            
+        row['ID_SUBCAT'] = 1
+        name = row['DS_ITEM'].lower()     
+        for subcat_id, regex in compiled_rules:
+            if regex.search(name):
+                row['ID_SUBCAT'] = subcat_id
+                break
+
     save_csv_dict(existing_data, output_path)
         
 def main():
-    input_path = "data/2023.csv/pessoa-item2.csv"
+    input_path = "data/2022.csv/pessoa-item.csv"
     input_path_2 = "licitacoes/2022.csv/item.csv"
     output_path = "data/2022.csv/pessoa-categoria.csv"
     
